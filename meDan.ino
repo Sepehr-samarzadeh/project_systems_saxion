@@ -29,7 +29,7 @@ unsigned long leftTurnMillis = 0;
 unsigned long rightTurnMillis = 0;
 unsigned long stoppingMillis = 0;
 
-//function periods for delays and syncing
+//function periods for delays and syncin
 const long motorRevDelay = 20;
 const long turnDelay = 50;
 const long stopDelay = 1500;
