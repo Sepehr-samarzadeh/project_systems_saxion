@@ -23,14 +23,17 @@ bool whiteLineDetected = false;
 unsigned long currentMillis = 0;
 unsigned long accePreviousMillis = 0;
 unsigned long decePreviousMillis = 0;
+unsigned long caliWitPrviousMillis = 0;
+unsigned long caliBlkPrviousMillis = 0;
 unsigned long leftTurnMillis = 0;
 unsigned long rightTurnMillis = 0;
 unsigned long stoppingMillis = 0;
 
 //function periods for delays and syncing
 const long motorRevDelay = 20;
-const long turnDelay = 100;
+const long turnDelay = 50;
 const long stopDelay = 1500;
+const long calibrattime = 1500;
 
 int currentSpeed = 0;
 
@@ -38,8 +41,10 @@ int currentSpeed = 0;
 void setup() {
   Serial.begin(9600);
   pinMode(motorPin, OUTPUT);
-  calibrateSensors();
-  
+  // calibrateSensors();
+  pinMode(A0,INPUT);
+  pinMode(A1,INPUT);
+  pinMode(A2,INPUT);
   //servo
   myServo.attach(servoPin);
   myServo.write(servoPos);
@@ -57,9 +62,9 @@ void setup() {
 void loop() {
   currentMillis = millis();
   
-  leftSensorValue = analogRead(leftSensorPin);
-  middleSensorValue = analogRead(middleSensorPin);
-  rightSensorValue = analogRead(rightSensorPin);
+  leftSensorValue = !digitalRead(leftSensorPin);
+  middleSensorValue = !digitalRead(middleSensorPin);
+  rightSensorValue = !digitalRead(rightSensorPin);
 
   Serial.print("Left Sensor: ");
   Serial.print(leftSensorValue);
@@ -76,14 +81,13 @@ void loop() {
     currentSpeed = decelerate(currentSpeed);
   }
 
-  // delay(1000);
 }
 
 bool followLine() {
   bool lineDetected = false;
   static bool state = false;
 
-  if (leftSensorValue < whiteThreshold) {
+  if (leftSensorValue == 1) {
     // left sensor detects the white line
     state = true;
     static bool turn;
@@ -91,38 +95,33 @@ bool followLine() {
     currentSpeed = accelerate(currentSpeed);
     Serial.println(servoPos);
     if(servoPos <110){
-      servoPos+=10;
-      moveLeft(servoPos);
-      leftTurnMillis = currentMillis;
-    }
-
-    if(currentMillis - leftTurnMillis >= turnDelay ){
-     leftTurnMillis = currentMillis;
-     myServo.write(90);
-    }
+      moveLeft(105);
+      delay(100);
+      myServo.write(85);
+    } 
     
+
     lineDetected = true;
-  } else if (rightSensorValue < whiteThreshold) {
+  } else if (rightSensorValue == 1) {
     state = true;
     Serial.println("turning right");
     currentSpeed = accelerate(currentSpeed);
     if(servoPos >65){
-      servoPos-=5;
-      moveRight(servoPos);
-      rightTurnMillis = currentMillis;
-    }
-    if(currentMillis - rightTurnMillis >= turnDelay ){
-     rightTurnMillis = currentMillis;
-     myServo.write(90);
-    }
+      // servoPos-=5;
+      moveRight(70);
+      delay(100);
+      myServo.write(95);
+    }  
+     
+    
 
     lineDetected = true;
-  } else if (middleSensorValue < whiteThreshold) {
+  } else if (middleSensorValue == 1) {
     state = false;
     Serial.println("moving forward");
     currentSpeed = accelerate(currentSpeed);
     lineDetected = true;
-  } else if (leftSensorValue > blackThreshold && middleSensorValue > blackThreshold && rightSensorValue > blackThreshold) {
+  } else if (leftSensorValue == 0 && middleSensorValue == 0 && rightSensorValue == 0) {
     // no sensor detects the white line
     stoppingMillis = currentMillis;
       if (currentMillis - stoppingMillis >= stopDelay && state == false ){
@@ -158,9 +157,13 @@ void calibrateSensors() {
 
   // read the sensor values over the black surface
   int blackReadings[3];
-  for (int i = 0; i < 3; i++) {
-    blackReadings[i] = analogRead(i == 0 ? leftSensorPin : (i == 1 ? middleSensorPin : rightSensorPin));
-    delay(100);
+
+  if(currentMillis - caliBlkPrviousMillis >= calibrattime){
+    caliBlkPrviousMillis = currentMillis;
+    for (int i = 0; i < 3; i++) {
+      blackReadings[i] = analogRead(i == 0 ? leftSensorPin : (i == 1 ? middleSensorPin : rightSensorPin));
+      // delay(100);
+    }
   }
   // find the max value for black anything more than this value count as black
   blackThreshold = max(max(blackReadings[0], blackReadings[1]), blackReadings[2]) - 50;
@@ -172,11 +175,12 @@ void calibrateSensors() {
 
   // read the sensor values over the white line
   int whiteReadings[3];
-  for (int i = 0; i < 3; i++) {
-    whiteReadings[i] = analogRead(i == 0 ? leftSensorPin : (i == 1 ? middleSensorPin : rightSensorPin));
-    delay(100);
+  if(currentMillis - caliWitPrviousMillis >= calibrattime){
+    caliWitPrviousMillis = currentMillis;
+    for (int i = 0; i < 3; i++) {
+      whiteReadings[i] = analogRead(i == 0 ? leftSensorPin : (i == 1 ? middleSensorPin : rightSensorPin));
+    }
   }
-
   // find the value for the white anything less than this become the new white
   whiteThreshold = min(min(whiteReadings[0], whiteReadings[1]), whiteReadings[2]) + 50;
 
