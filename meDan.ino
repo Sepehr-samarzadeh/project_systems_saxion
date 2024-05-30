@@ -1,7 +1,9 @@
 #include <Servo.h>
 #define leftSensorPin A0
-#define middleSensorPin A1
-#define rightSensorPin A2
+#define lLeftSensorPin A1
+#define middleSensorPin A2
+#define rRightSensorPin A3
+#define rightSensorPin A4
 #define motorPin 9
 
 // Motor Connections (Both must use PWM pins)
@@ -13,7 +15,7 @@ Servo myServo;
 int servoPin = 3;
 int servoPos = 90;
 
-int leftSensorValue, middleSensorValue, rightSensorValue;
+int leftSensorValue,lLeftSensorValue, middleSensorValue, rightSensorValue, rRightSensorValue;
 int blackThreshold, whiteThreshold;
 
 // flag to track if the white line is detected
@@ -45,6 +47,8 @@ void setup() {
   pinMode(A0,INPUT);
   pinMode(A1,INPUT);
   pinMode(A2,INPUT);
+  pinMode(A3,INPUT);
+  pinMode(A4,INPUT);
   //servo
   myServo.attach(servoPin);
   myServo.write(servoPos);
@@ -63,15 +67,22 @@ void loop() {
   currentMillis = millis();
   
   leftSensorValue = !digitalRead(leftSensorPin);
+  lLeftSensorValue = !digitalRead(lLeftSensorPin);
   middleSensorValue = !digitalRead(middleSensorPin);
   rightSensorValue = !digitalRead(rightSensorPin);
+  rRightSensorValue = !digitalRead(rRightSensorPin);
 
   Serial.print("Left Sensor: ");
   Serial.print(leftSensorValue);
+  Serial.print("\tmid Left Sensor: ");
+  Serial.print(lLeftSensorValue);
   Serial.print("\tMiddle Sensor: ");
-  Serial.print(middleSensorValue);
+  Serial.print(middleSensorValue); 
+  Serial.print("\tmid Right Sensor: ");
+  Serial.println(rRightSensorValue);
   Serial.print("\tRight Sensor: ");
   Serial.println(rightSensorValue);
+ 
 
   // follow the line based on the sensor readings
   whiteLineDetected = followLine();
@@ -95,22 +106,51 @@ bool followLine() {
     currentSpeed = accelerate(currentSpeed);
     Serial.println(servoPos);
     if(servoPos <110){
-      moveLeft(105);
+      moveLeft(109);
       delay(100);
-      myServo.write(85);
+      myServo.write(90);
     } 
     
 
     lineDetected = true;
-  } else if (rightSensorValue == 1) {
+  }else if (lLeftSensorValue == 1) {
+    // left sensor detects the white line
+    state = true;
+    static bool turn;
+    Serial.println("turning small left");
+    currentSpeed = accelerate(currentSpeed);
+    Serial.println(servoPos);
+    if(servoPos <101){
+      moveLeft(100);
+      delay(100);
+      myServo.write(90);
+    } 
+    
+
+    lineDetected = true;
+  }else if (rightSensorValue == 1) {
     state = true;
     Serial.println("turning right");
     currentSpeed = accelerate(currentSpeed);
     if(servoPos >65){
       // servoPos-=5;
-      moveRight(70);
+      moveRight(66);
       delay(100);
       myServo.write(95);
+    }  
+     
+    
+
+    lineDetected = true;
+  } else if (rRightSensorValue == 1) {
+    state = true;
+    Serial.println("turning small right");
+    currentSpeed = accelerate(currentSpeed);
+    if(servoPos >75){
+      // servoPos-=5;
+      moveRight(80);
+      delay(100);
+      myServo.write(90);
     }  
      
     
