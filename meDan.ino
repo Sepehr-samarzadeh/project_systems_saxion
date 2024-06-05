@@ -12,7 +12,8 @@
 // Motor Connections (Both must use PWM pins)
 #define RPWM 5
 #define LPWM 6
-#define maxSpeed 30
+#define maxSpeed 25
+#define slowSpeed 22
 
 Servo myServo;
 int servoPin = 3;
@@ -100,16 +101,12 @@ void followLine() {
 
 
   //drive if any of the sensors output high
-  if(current_state != stop)
-  {
-   currentSpeed = accelerate(currentSpeed);
-  }
-
 
   switch (current_state)
   {
     case straight:
     //driving functionality
+    currentSpeed = changeSpeed(currentSpeed, maxSpeed);
     steerStraight();
     //state switching
       if (hardleftSensorValue == 1 && middleSensorValue == 1 && hardrightSensorValue == 1) current_state = stop;
@@ -118,10 +115,18 @@ void followLine() {
       break;
     case turn_right:
       //turn_right functionality
-      if (hardrightSensorValue == 1) hardTurn = true;
+      if (hardrightSensorValue == 1 || rightSensorValue == 0) hardTurn = true;
       if (rightSensorValue == 1) hardTurn = false;
-      if (hardTurn) steerhardRight();
-      else steerRight();
+      if (hardTurn) 
+      {
+        currentSpeed = changeSpeed(currentSpeed, slowSpeed);
+        steerhardRight();
+      }
+      else 
+      {
+        currentSpeed = changeSpeed(currentSpeed, maxSpeed);
+        steerRight();
+      }
 
       //state switching
       if (hardleftSensorValue == 1 && middleSensorValue == 1 && hardrightSensorValue == 1) current_state = stop;
@@ -130,10 +135,18 @@ void followLine() {
       break;
     case turn_left:
       //turn_left functionality
-      if (hardleftSensorValue == 1) hardTurn = true;
+      if (hardleftSensorValue == 1 || leftSensorValue == 0) hardTurn = true;
       if (leftSensorValue == 1) hardTurn = false;
-      if (hardTurn) steerhardLeft();
-      else steerLeft();
+      if (hardTurn) 
+      {
+        currentSpeed = changeSpeed(currentSpeed, slowSpeed);
+        steerhardLeft();
+      }
+      else 
+      {
+        currentSpeed = changeSpeed(currentSpeed, maxSpeed);
+        steerLeft();
+      }
 
       //state switching
       if (hardleftSensorValue == 1 && middleSensorValue == 1 && hardrightSensorValue == 1) current_state = stop;
@@ -141,7 +154,7 @@ void followLine() {
       else if (rightSensorValue == 1 || hardrightSensorValue) current_state = turn_right;
       break;
     case stop:
-      currentSpeed = decelerate(currentSpeed);
+      currentSpeed = changeSpeed(currentSpeed, 0);
       if (hardleftSensorValue == 0 && leftSensorValue == 0 && middleSensorValue == 1 && rightSensorValue == 0 && hardrightSensorValue == 0) current_state = straight;
       break;
   }
@@ -166,7 +179,7 @@ void steerhardRight(){
   Serial.println("turning hard right");
     Serial.println(servoPos);
     if(servoPos >30){
-      servoPos = 31;
+      servoPos = 29;
       myServo.write(servoPos);
       delay(100);
       servoPos = 90;
@@ -203,7 +216,7 @@ void steerhardLeft(){
   Serial.println("turning hard left");
     Serial.println(servoPos);
     if(servoPos <140){
-      servoPos = 139;
+      servoPos = 141;
       myServo.write(servoPos);
       delay(100);
       servoPos = 90;
@@ -212,26 +225,23 @@ void steerhardLeft(){
      Serial.println(servoPos);
 }
 
-
-int accelerate(int currentSpeed){
-  // if(currentMillies - accePreviousMillies >= motorRevDelay ){
-  //   accePreviousMillies = currentMillies;
-    digitalWrite(RPWM, LOW);
-    for (int i = currentSpeed; i < maxSpeed; i++) {
+int changeSpeed(int currentSpeed, int newSpeed)
+{
+  digitalWrite(RPWM, LOW);
+  if (currentSpeed > newSpeed)
+  {
+    for (int i = currentSpeed; i >= newSpeed; i--)
+    {
       analogWrite(LPWM, i);
     }
-  // }
-  return currentSpeed;
-}
-
-int decelerate(int currentSpeed){
-  // if(currentMillies - decePreviousMillies >= motorRevDelay){
-  //   decePreviousMillies = currentMillies;
-    digitalWrite(RPWM, LOW);
-    for (int i = currentSpeed; i >= 0; i--) {
-      analogWrite(LPWM, 0);
+  }
+  else
+  {
+    for (int i = currentSpeed; i <= newSpeed; i++)
+    {
+      analogWrite(LPWM, i);
     }
-  // }
+  }
   return currentSpeed;
 }
 
