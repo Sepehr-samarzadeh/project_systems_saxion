@@ -1,8 +1,11 @@
+#include <Arduino.h>
+
 #include <Servo.h>
-#define leftSensorPin A0
-#define lLeftSensorPin A1
-#define middleSensorPin A2
-#define rRightSensorPin A3
+
+#define hardleftSensorPin A0
+#define middleSensorPin A1
+#define hardrightSensorPin A2
+#define leftSensorPin A3
 #define rightSensorPin A4
 #define motorPin 9
 
@@ -15,8 +18,7 @@ Servo myServo;
 int servoPin = 3;
 int servoPos = 90;
 
-int leftSensorValue,lLeftSensorValue, middleSensorValue, rightSensorValue, rRightSensorValue;
-int blackThreshold, whiteThreshold;
+int leftSensorValue, middleSensorValue, rightSensorValue, hardleftSensorValue, hardrightSensorValue;
 
 // flag to track if the white line is detected
 bool whiteLineDetected = false;
@@ -38,6 +40,13 @@ const long stopDelay = 1500;
 const long calibrattime = 1500;
 
 int currentSpeed = 0;
+
+enum State {
+  straight,
+  turn_left,
+  turn_right,
+  stop
+};
 
 
 void setup() {
@@ -67,169 +76,141 @@ void loop() {
   currentMillis = millis();
   
   leftSensorValue = !digitalRead(leftSensorPin);
-  lLeftSensorValue = !digitalRead(lLeftSensorPin);
   middleSensorValue = !digitalRead(middleSensorPin);
   rightSensorValue = !digitalRead(rightSensorPin);
-  rRightSensorValue = !digitalRead(rRightSensorPin);
+  hardleftSensorValue = !digitalRead(hardleftSensorPin);
+  hardrightSensorValue = !digitalRead(hardrightSensorPin);
 
-  Serial.print("Left Sensor: ");
-  Serial.print(leftSensorValue);
-  Serial.print("\tmid Left Sensor: ");
-  Serial.print(lLeftSensorValue);
-  Serial.print("\tMiddle Sensor: ");
-  Serial.print(middleSensorValue); 
-  Serial.print("\tmid Right Sensor: ");
-  Serial.println(rRightSensorValue);
-  Serial.print("\tRight Sensor: ");
-  Serial.println(rightSensorValue);
+  //Serial.print("Left Sensor: ");
+  //Serial.print(leftSensorValue);
+  //Serial.print("\tMiddle Sensor: ");
+  //Serial.print(middleSensorValue);
+  //Serial.print("\tRight Sensor: ");
+  //Serial.println(rightSensorValue);
  
 
   // follow the line based on the sensor readings
-  whiteLineDetected = followLine();
-
-  if (!whiteLineDetected) {
-    Serial.println("No white line detected. Stopping the car.");
-    currentSpeed = decelerate(currentSpeed);
-  }
-
+  followLine();
 }
 
-bool followLine() {
+void followLine() {
   bool lineDetected = false;
-  static bool state = false;
+  static bool hardTurn = false;
+  static State current_state = straight;
 
-  if (leftSensorValue == 1) {
-    // left sensor detects the white line
-    state = true;
-    static bool turn;
-    Serial.println("turning left");
-    currentSpeed = accelerate(currentSpeed);
-    Serial.println(servoPos);
-    if(servoPos <110){
-      moveLeft(109);
-      delay(100);
-      myServo.write(90);
-    } 
-    
 
-    lineDetected = true;
-  }else if (lLeftSensorValue == 1) {
-    // left sensor detects the white line
-    state = true;
-    static bool turn;
-    Serial.println("turning small left");
-    currentSpeed = accelerate(currentSpeed);
-    Serial.println(servoPos);
-    if(servoPos <101){
-      moveLeft(100);
-      delay(100);
-      myServo.write(90);
-    } 
-    
+  //drive if any of the sensors output high
+  if(current_state != stop)
+  {
+   currentSpeed = accelerate(currentSpeed);
+  }
 
-    lineDetected = true;
-  }else if (rightSensorValue == 1) {
-    state = true;
-    Serial.println("turning right");
-    currentSpeed = accelerate(currentSpeed);
-    if(servoPos >65){
-      // servoPos-=5;
-      moveRight(66);
-      delay(100);
-      myServo.write(95);
-    }  
-     
-    
 
-    lineDetected = true;
-  } else if (rRightSensorValue == 1) {
-    state = true;
-    Serial.println("turning small right");
-    currentSpeed = accelerate(currentSpeed);
-    if(servoPos >75){
-      // servoPos-=5;
-      moveRight(80);
-      delay(100);
-      myServo.write(90);
-    }  
-     
-    
+  switch (current_state)
+  {
+    case straight:
+    //driving functionality
+    steerStraight();
+    //state switching
+      if (hardleftSensorValue == 1 && middleSensorValue == 1 && hardrightSensorValue == 1) current_state = stop;
+      else if (rightSensorValue == 1 || hardrightSensorValue == 1) current_state = turn_right;
+      else if (leftSensorValue == 1 || hardleftSensorValue == 1) current_state = turn_left;
+      break;
+    case turn_right:
+      //turn_right functionality
+      if (hardrightSensorValue == 1) hardTurn = true;
+      if (rightSensorValue == 1) hardTurn = false;
+      if (hardTurn) steerhardRight();
+      else steerRight();
 
-    lineDetected = true;
-  } else if (middleSensorValue == 1) {
-    state = false;
-    Serial.println("moving forward");
-    currentSpeed = accelerate(currentSpeed);
-    lineDetected = true;
-  } else if (leftSensorValue == 0 && middleSensorValue == 0 && rightSensorValue == 0) {
-    // no sensor detects the white line
-    stoppingMillis = currentMillis;
-      if (currentMillis - stoppingMillis >= stopDelay && state == false ){
-        stoppingMillis = currentMillis;
-        state = true;
-        Serial.println("Stopping!");
-        currentSpeed = decelerate(currentSpeed);
-      }
-      Serial.println("no line detected");
+      //state switching
+      if (hardleftSensorValue == 1 && middleSensorValue == 1 && hardrightSensorValue == 1) current_state = stop;
+      else if (middleSensorValue == 1) current_state = straight;
+      else if (leftSensorValue == 1 || hardleftSensorValue) current_state = turn_left;
+      break;
+    case turn_left:
+      //turn_left functionality
+      if (hardleftSensorValue == 1) hardTurn = true;
+      if (leftSensorValue == 1) hardTurn = false;
+      if (hardTurn) steerhardLeft();
+      else steerLeft();
+
+      //state switching
+      if (hardleftSensorValue == 1 && middleSensorValue == 1 && hardrightSensorValue == 1) current_state = stop;
+      else if (middleSensorValue == 1) current_state = straight;
+      else if (rightSensorValue == 1 || hardrightSensorValue) current_state = turn_right;
+      break;
+    case stop:
+      currentSpeed = decelerate(currentSpeed);
+      if (hardleftSensorValue == 0 && leftSensorValue == 0 && middleSensorValue == 1 && rightSensorValue == 0 && hardrightSensorValue == 0) current_state = straight;
+      break;
+  }
+
+}
+
+void steerRight(){
  
-    
-    
-  }
-
-  return lineDetected;
+  Serial.println("turning right");
+    Serial.println(servoPos);
+    if(servoPos >80){
+      servoPos = 81;
+      myServo.write(servoPos);
+      delay(100);
+      servoPos = 90;
+      myServo.write(servoPos);
+    } 
+     Serial.println(servoPos);
 }
-
-void moveRight(int num){
-	
-  myServo.write(num);
-  Serial.println(num);
+void steerhardRight(){
+ 
+  Serial.println("turning hard right");
+    Serial.println(servoPos);
+    if(servoPos >30){
+      servoPos = 31;
+      myServo.write(servoPos);
+      delay(100);
+      servoPos = 90;
+      myServo.write(servoPos);
+    } 
+     Serial.println(servoPos);
 }
-void moveLeft(int num){
-  myServo.write(num);
-  Serial.println(num);
+void steerStraight(){
+ 
+  Serial.println("turning straight");
+    Serial.println(servoPos);
+    if(servoPos >91 || servoPos < 90){
+      servoPos = 90;
+      myServo.write(servoPos);
+      delay(100);
+      servoPos = 90;
+      myServo.write(servoPos);
+    } 
+     Serial.println(servoPos);
 }
-
-
-
-void calibrateSensors() {
-  Serial.println("starting calibration...");
-  Serial.println("place the sensors over the black surface");
-
-  // read the sensor values over the black surface
-  int blackReadings[3];
-
-  if(currentMillis - caliBlkPrviousMillis >= calibrattime){
-    caliBlkPrviousMillis = currentMillis;
-    for (int i = 0; i < 3; i++) {
-      blackReadings[i] = analogRead(i == 0 ? leftSensorPin : (i == 1 ? middleSensorPin : rightSensorPin));
-      // delay(100);
-    }
-  }
-  // find the max value for black anything more than this value count as black
-  blackThreshold = max(max(blackReadings[0], blackReadings[1]), blackReadings[2]) - 50;
-
-  Serial.print("black threshold: ");
-  Serial.println(blackThreshold);
-
-  Serial.println("place the sensors over the white line.");
-
-  // read the sensor values over the white line
-  int whiteReadings[3];
-  if(currentMillis - caliWitPrviousMillis >= calibrattime){
-    caliWitPrviousMillis = currentMillis;
-    for (int i = 0; i < 3; i++) {
-      whiteReadings[i] = analogRead(i == 0 ? leftSensorPin : (i == 1 ? middleSensorPin : rightSensorPin));
-    }
-  }
-  // find the value for the white anything less than this become the new white
-  whiteThreshold = min(min(whiteReadings[0], whiteReadings[1]), whiteReadings[2]) + 50;
-
-  Serial.print("White threshold: ");
-  Serial.println(whiteThreshold);
-
-  Serial.println("Calibration complete.");
+void steerLeft(){
+  Serial.println("turning left");
+    //Serial.println(servoPos);
+    if(servoPos <100){
+      servoPos = 101;
+      myServo.write(servoPos);
+      delay(100);
+      servoPos = 90;
+      myServo.write(servoPos);
+    } 
+     Serial.println(servoPos);
 }
-
+void steerhardLeft(){
+  Serial.println("turning hard left");
+    Serial.println(servoPos);
+    if(servoPos <140){
+      servoPos = 139;
+      myServo.write(servoPos);
+      delay(100);
+      servoPos = 90;
+      myServo.write(servoPos);
+    } 
+     Serial.println(servoPos);
+}
 
 
 int accelerate(int currentSpeed){
@@ -253,3 +234,15 @@ int decelerate(int currentSpeed){
   // }
   return currentSpeed;
 }
+
+//   double error = digitalRead(leftPin) && digitalRead(rightPin);
+  
+
+//  double pid(double error){
+//   double P = error; //proportional
+//   static double integral += error * dt; // change dt to angle maybe
+//   double derivative = (error - pre) / dt; 
+//   pre = error;
+//   doulbe output = (kp * P ) + (ki * integral) + (kd * derivative);
+//   return output;
+//  }
